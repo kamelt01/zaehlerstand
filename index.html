@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171e28" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Zählerbuch">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Zählerbuch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: Kopfleiste mit Reitern, darunter eine Spalte pro Ansicht; Zählerstände in Mono wie ein Rollenzählwerk */
+:root {
+  --bg: #f3f5f8; --surface: #ffffff; --surface-2: #e9edf3; --fg: #18212d; --muted: #5b6676; --line: #d5dbe4;
+  --accent: #2456c9; --accent-fg: #ffffff;
+  --c-strom: #d99a06; --c-wp: #0f9488; --c-hh: #8a6d1f; --c-wasser: #1f77d0; --c-gas: #d4562a; --c-kosten: #6b4fc4;
+  --ok: #1d8a4a; --warn: #b7791f; --bad: #c0392b;
+  --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f141b; --surface: #171e28; --surface-2: #202936; --fg: #e6ebf2; --muted: #9aa6b7; --line: #2c3746;
+  --accent: #6d9bff; --accent-fg: #0b1220;
+  --c-strom: #f2b928; --c-wp: #2cc4b5; --c-hh: #c9a54a; --c-wasser: #5aa8f2; --c-gas: #f07a4f; --c-kosten: #a48df0;
+  --ok: #4cc27f; --warn: #e3a948; --bad: #ef6b5d; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f141b; --surface: #171e28; --surface-2: #202936; --fg: #e6ebf2; --muted: #9aa6b7; --line: #2c3746;
+  --accent: #6d9bff; --accent-fg: #0b1220;
+  --c-strom: #f2b928; --c-wp: #2cc4b5; --c-hh: #c9a54a; --c-wasser: #5aa8f2; --c-gas: #f07a4f; --c-kosten: #a48df0;
+  --ok: #4cc27f; --warn: #e3a948; --bad: #ef6b5d; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding-block: 10px; }
+.brand { font-family: var(--f-display); font-weight: 700; font-size: 1.25rem; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+.brand .dial { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--fg); position: relative; }
+.brand .dial::after { content: ""; position: absolute; left: 50%; top: 50%; width: 2px; height: 10px; background: var(--c-strom); transform-origin: top center; transform: translate(-50%, 0) rotate(215deg); }
+nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+nav.tabs a { text-decoration: none; color: var(--muted); padding: 6px 12px; border-radius: 999px; font-weight: 500; }
+nav.tabs a:hover { color: var(--fg); background: var(--surface-2); }
+nav.tabs a[aria-current="page"] { background: var(--fg); color: var(--bg); }
+.status { margin-left: auto; font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status.ok .dot { background: var(--ok); } .status.warn .dot { background: var(--warn); }
+
+main { padding-block: 24px 64px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 1.6rem; } h2 { font-size: 1.2rem; } h3 { font-size: 1rem; }
+.lead { color: var(--muted); margin: 4px 0 0; max-width: 65ch; }
+.stack { display: flex; flex-direction: column; gap: 20px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; min-width: 0; }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.banner { border: 1px dashed var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); border-radius: var(--r); padding: 10px 14px; font-size: 0.9rem; }
+.banner[hidden] { display: none; }
+
+button, .btn { font: inherit; font-weight: 500; border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 7px 14px; border-radius: 8px; cursor: pointer; }
+button:hover { background: var(--surface-2); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button.primary:hover { filter: brightness(1.08); }
+button.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
+button.small { padding: 3px 10px; font-size: 0.85rem; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input, select { font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+input.meter { font-family: var(--f-mono); font-size: 1.35rem; letter-spacing: 0.06em; width: 100%; padding: 8px 12px; background: var(--surface-2); border-color: transparent; text-align: right; }
+input.meter:focus { background: var(--surface); border-color: var(--accent); }
+
+/* Erfassen */
+.entry-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .entry-grid { grid-template-columns: 1fr; } }
+.datebar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.datebar input[type=date] { font-family: var(--f-mono); font-size: 1.05rem; }
+.datebar .wd { color: var(--muted); font-weight: 500; min-width: 7ch; }
+.meters { display: grid; gap: 12px; margin-top: 16px; }
+.meter-row { display: grid; grid-template-columns: 6px minmax(0, 1fr) minmax(0, 190px); gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.meter-row:first-child { border-top: 0; }
+.meter-row .swatch { align-self: stretch; border-radius: 3px; }
+.meter-row .name { font-weight: 600; }
+.meter-row .hint { font-size: 0.82rem; color: var(--muted); }
+.meter-row .hint b { font-weight: 500; color: var(--fg); }
+.meter-row .hint .warn { color: var(--warn); font-weight: 600; }
+.meter-row .hint .bad { color: var(--bad); font-weight: 600; }
+@media (max-width: 520px) { .meter-row { grid-template-columns: 6px minmax(0, 1fr); } .meter-row .meter-in { grid-column: 2; } }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
+.toast { font-size: 0.88rem; color: var(--ok); }
+.toast.err { color: var(--bad); }
+.recent { list-style: none; margin: 10px 0 0; padding: 0; }
+.recent li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.recent li:hover { color: var(--accent); }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip { font-size: 0.7rem; padding: 1px 7px; border-radius: 999px; font-weight: 600; background: color-mix(in srgb, var(--chip) 18%, transparent); color: var(--chip); }
+
+/* Übersicht */
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; border-top: 4px solid var(--k); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.kpi .big { font-family: var(--f-mono); font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.kpi .big small { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.kpi dl { display: grid; grid-template-columns: auto auto; gap: 2px 10px; margin: 4px 0 0; font-size: 0.85rem; }
+.kpi dt { color: var(--muted); } .kpi dd { margin: 0; text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.kpi .note { font-size: 0.75rem; color: var(--muted); }
+.chart-box { position: relative; height: 320px; }
+@media (max-width: 520px) { .chart-box { height: 260px; } }
+
+/* Tabellen */
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; background: var(--surface); position: sticky; top: 0; }
+th:first-child, td:first-child { text-align: left; }
+td.num, td .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+tr.fc td { color: var(--muted); font-style: italic; }
+tfoot td { font-weight: 600; border-top: 2px solid var(--line); }
+.controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.controls label { display: flex; flex-direction: column; gap: 3px; font-size: 0.78rem; color: var(--muted); font-weight: 500; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 7px 12px; }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+
+/* Tarife */
+.tariff-table input { width: 100%; min-width: 92px; font-family: var(--f-mono); font-size: 0.88rem; padding: 5px 7px; text-align: right; }
+.tariff-table input[type=date] { min-width: 140px; text-align: left; }
+.tariff-table td { padding: 5px 4px; }
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.settings-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--muted); font-weight: 500; }
+.confirm { display: inline-flex; gap: 6px; align-items: center; font-size: 0.85rem; }
+.empty { padding: 24px; text-align: center; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+:root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); -webkit-text-size-adjust: 100%; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="dial" aria-hidden="true"></span>Zählerbuch</div>
+    <nav class="tabs" aria-label="Ansichten">
+      <a href="#erfassen" data-view="erfassen">Erfassen</a>
+      <a href="#uebersicht" data-view="uebersicht">Übersicht</a>
+      <a href="#auswertung" data-view="auswertung">Auswertung</a>
+      <a href="#tarife" data-view="tarife">Tarife</a>
+      <a href="#daten" data-view="daten">Daten</a>
+    </nav>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">Lade …</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="banner" id="demoBanner" hidden>
+    <b>Beispieldaten.</b> Noch keine eigenen Ablesungen gespeichert, deshalb siehst du erfundene Werte und einen Beispieltarif. Sobald du die erste eigene Ablesung speicherst, verschwinden die Beispielwerte.
+  </div>
+
+  <!-- ERFASSEN -->
+  <section id="view-erfassen" class="stack" hidden>
+    <div>
+      <h1>Zählerstände erfassen</h1>
+      <p class="lead">Trage die abgelesenen Zählerstände ein. Einzelne Zähler oder ganze Tage darfst du auslassen: Der Verbrauch dazwischen wird gleichmäßig auf die Tage verteilt.</p>
+    </div>
+    <div class="entry-grid">
+      <form class="panel" id="entryForm" autocomplete="off">
+        <div class="datebar">
+          <button type="button" id="dPrev" aria-label="Vorheriger Tag">◀</button>
+          <input type="date" id="entryDate" required>
+          <button type="button" id="dNext" aria-label="Nächster Tag">▶</button>
+          <button type="button" id="dToday">Heute</button>
+          <span class="wd" id="entryWd"></span>
+        </div>
+        <div class="meters" id="meterRows"></div>
+        <div class="actions">
+          <button type="submit" class="primary" id="saveBtn">Speichern</button>
+          <button type="button" id="clearBtn">Felder leeren</button>
+          <span id="delWrap"></span>
+          <span class="toast" id="toast" role="status"></span>
+        </div>
+      </form>
+      <aside class="panel">
+        <h2>Letzte Ablesungen</h2>
+        <p class="muted" style="margin:4px 0 0;font-size:.85rem">Antippen zum Bearbeiten.</p>
+        <ul class="recent" id="recentList"></ul>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ÜBERSICHT -->
+  <section id="view-uebersicht" class="stack" hidden>
+    <div>
+      <h1 id="ovTitle">Übersicht</h1>
+      <p class="lead" id="ovLead"></p>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2 id="ovChartTitle">Kosten pro Monat</h2>
+        <span class="muted" style="font-size:.82rem">Helle Balken = Prognose</span>
+      </div>
+      <div class="chart-box" style="margin-top:10px"><canvas id="ovChart" aria-label="Monatliche Kosten nach Medium"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Strom: Wärmepumpe und Haushalt</h2>
+      <p class="muted" style="margin:4px 0 0;font-size:.85rem">Die Wärmepumpe ist im <span id="wpMeterName">Zähler</span> enthalten. Hier siehst du, wie sich der gesamte Stromverbrauch aufteilt.</p>
+      <div class="chart-box" style="margin-top:10px"><canvas id="ovWpChart" aria-label="Stromverbrauch Wärmepumpe und Haushalt pro Monat"></canvas></div>
+    </div>
+  </section>
+
+  <!-- AUSWERTUNG -->
+  <section id="view-auswertung" class="stack" hidden>
+    <div>
+      <h1>Auswertung</h1>
+      <p class="lead">Verbrauch und Kosten pro Tag, Monat oder Jahr. Geschätzte Tage (ohne eigene Ablesung) und Prognosen sind gekennzeichnet.</p>
+    </div>
+    <div class="panel stack">
+      <div class="controls">
+        <label>Größe
+          <select id="aMetric"></select>
+        </label>
+        <div><div class="label" style="margin-bottom:3px">Zeitraster</div>
+          <div class="seg" id="aGran">
+            <button type="button" data-g="day">Tag</button>
+            <button type="button" data-g="month" aria-pressed="true">Monat</button>
+            <button type="button" data-g="year">Jahr</button>
+          </div>
+        </div>
+        <label>Von <input type="date" id="aFrom"></label>
+        <label>Bis <input type="date" id="aTo"></label>
+        <label style="flex-direction:row;align-items:center;gap:6px;color:var(--fg)"><input type="checkbox" id="aFc" checked> Prognose zeigen</label>
+      </div>
+      <div class="chart-box"><canvas id="aChart" aria-label="Auswertungsdiagramm"></canvas></div>
+      <div class="table-scroll" style="max-height:480px"><table id="aTable"></table></div>
+      <p class="muted" style="font-size:.8rem;margin:0" id="aMethod"></p>
+    </div>
+  </section>
+
+  <!-- TARIFE -->
+  <section id="view-tarife" class="stack" hidden>
+    <div>
+      <h1>Tarife und Einstellungen</h1>
+      <p class="lead">Lege für jeden Zeitraum (meist ein Abrechnungsjahr) die Preise fest. Für jeden Tag gilt der Tarif, in dessen Zeitraum er fällt. Ohne Enddatum gilt ein Tarif bis zum nächsten.</p>
+    </div>
+    <div class="panel stack">
+      <div class="table-scroll">
+        <table class="tariff-table" id="tariffTable"></table>
+      </div>
+      <div class="actions" style="margin-top:0">
+        <button type="button" id="addTariff">Zeitraum hinzufügen</button>
+        <button type="button" class="primary" id="saveTariffs">Tarife speichern</button>
+        <span class="toast" id="tariffToast" role="status"></span>
+      </div>
+      <p class="muted" style="font-size:.82rem;margin:0">Gas wird in m³ abgelesen und in kWh abgerechnet: kWh = m³ × Brennwert × Zustandszahl (beide Werte stehen auf deiner Gasrechnung). Die Grundgebühren werden tageweise umgelegt (Jahr ÷ 365, Monat × 12 ÷ 365).</p>
+    </div>
+    <div class="panel stack">
+      <h2>Zähler</h2>
+      <div class="settings-grid">
+        <label>Name Stromzähler 1 <input id="sName1" maxlength="40"></label>
+        <label>Name Stromzähler 2 <input id="sName2" maxlength="40"></label>
+        <label>Wärmepumpe ist enthalten in
+          <select id="sWpIn"><option value="e1">Stromzähler 1</option><option value="e2">Stromzähler 2</option></select>
+        </label>
+      </div>
+      <div class="actions" style="margin-top:0">
+        <button type="button" class="primary" id="saveSettings">Einstellungen speichern</button>
+        <span class="toast" id="settingsToast" role="status"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATEN -->
+  <section id="view-daten" class="stack" hidden>
+    <div>
+      <h1>Alle Ablesungen</h1>
+      <p class="lead">Jede Zeile ist ein Tag mit mindestens einem abgelesenen Zählerstand.</p>
+    </div>
+    <div class="panel stack">
+      <div class="actions" style="margin-top:0">
+        <button type="button" id="expJson">Sicherung herunterladen (JSON)</button>
+        <button type="button" id="expCsv">Tageswerte herunterladen (CSV)</button>
+        <label class="btn" for="impFile" style="display:inline-block">Sicherung einspielen …</label>
+        <input type="file" id="impFile" accept=".json,application/json,text/plain" hidden>
+        <span class="toast" id="dataToast" role="status"></span>
+      </div>
+      <div class="table-scroll" style="max-height:600px"><table id="dataTable"></table></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+"use strict";
+/* ---------- Grundlagen ---------- */
+const DAY = 86400000;
+const pad = n => String(n).padStart(2, "0");
+const toDay = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / DAY;
+const fromDay = d => new Date(d * DAY).toISOString().slice(0, 10);
+const todayStr = () => { const n = new Date(); return `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}`; };
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const nf = {};
+const fmt = (v, dec = 0) => v == null || !isFinite(v) ? "–" : (nf[dec] ||= new Intl.NumberFormat("de-DE", { minimumFractionDigits: dec, maximumFractionDigits: dec })).format(v);
+const eur = v => v == null || !isFinite(v) ? "–" : fmt(v, 2) + " €";
+const parseNum = s => { s = String(s ?? "").trim().replace(/\s/g, ""); if (!s) return null; if (s.includes(",")) s = s.replace(/\./g, "").replace(",", "."); const v = Number(s); return isFinite(v) ? v : NaN; };
+const MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+const WD = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+const fmtDate = ds => `${ds.slice(8, 10)}.${ds.slice(5, 7)}.${ds.slice(0, 4)}`;
+const isLeap = y => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+
+const METERS = [
+  { k: "e1", unit: "kWh", dec: 0, color: "--c-strom" },
+  { k: "e2", unit: "kWh", dec: 0, color: "--c-strom" },
+  { k: "wp", unit: "kWh", dec: 1, color: "--c-wp", label: "Wärmepumpe" },
+  { k: "w", unit: "m³", dec: 1, color: "--c-wasser", label: "Wasseruhr" },
+  { k: "g", unit: "m³", dec: 1, color: "--c-gas", label: "Gasuhr" },
+];
+const meterLabel = m => m.k === "e1" ? S.settings.name1 : m.k === "e2" ? S.settings.name2 : m.label;
+
+const DEFAULT_SETTINGS = () => ({
+  name1: "Stromzähler 1", name2: "Stromzähler 2", wpIn: "e2",
+  tariffs: [{ from: "2025-01-01", to: "", pE: 0.32, gE: 150, pW: 4.2, gW: 0, pG: 0.11, gG: 14, bw: 11.2, zz: 0.95 }],
+});
+
+/* ---------- Zustand und Speicher ---------- */
+const S = { readings: {}, settings: DEFAULT_SETTINGS(), settingsStored: false, demo: false, mode: "connecting", loaded: false };
+let db = null, uid = null, col = null;
+const writeChains = {};
+const chainWrite = (key, fn) => (writeChains[key] = (writeChains[key] || Promise.resolve()).catch(() => {}).then(fn));
+const LS_KEY = "zaehlerbuch.v1";
+
+function setStatus(kind, text) { $("status").className = "status " + kind; $("statusText").textContent = text; }
+
+function lsLoad() { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || "null"); if (j) { S.readings = j.readings || {}; if (j.settings) { S.settings = { ...DEFAULT_SETTINGS(), ...j.settings }; S.settingsStored = true; } } } catch (e) {} }
+function lsSave() { try { localStorage.setItem(LS_KEY, JSON.stringify({ readings: S.readings, settings: S.settingsStored ? S.settings : null })); return true; } catch (e) { return false; } }
+
+async function initStore() {
+  S.mode = "local"; lsLoad();
+  setStatus("ok", "Gespeichert auf diesem Gerät");
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+  finishLoad();
+}
+
+async function persistYear(year) {
+  const yearReadings = {};
+  for (const [d, r] of Object.entries(S.readings)) if (d.startsWith(year)) yearReadings[d] = r;
+  if (S.mode === "db") {
+    const ref = col.doc("y" + year);
+    return chainWrite("y" + year, () => Object.keys(yearReadings).length ? ref.set({ readings: yearReadings }) : ref.delete());
+  }
+  if (!lsSave()) throw { code: "storage" };
+}
+async function persistSettings() {
+  S.settingsStored = true;
+  if (S.mode === "db") return chainWrite("settings", () => col.doc("settings").set(JSON.parse(JSON.stringify(S.settings))));
+  if (!lsSave()) throw { code: "storage" };
+}
+
+/* ---------- Beispieldaten (nur Anzeige, nie gespeichert) ---------- */
+function makeDemo() {
+  const out = {}; const end = toDay(todayStr()); const start = toDay("2025-01-01");
+  let e1 = 48210, e2 = 12450, wp = 3120.4, w = 812.3, g = 15403.2; let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let d = start; d <= end; d++) {
+    const m = new Date(d * DAY).getUTCMonth(); const winter = Math.cos((m - 0.5) / 12 * 2 * Math.PI); // 1 = Jan, -1 = Jul
+    const wpDay = Math.max(1.5, 9 + 9 * winter + rnd() * 3);
+    e1 += 6.5 + rnd() * 3 + winter; e2 += wpDay + 1.2; wp += wpDay; w += 0.32 + rnd() * 0.15; g += Math.max(0.3, 1.6 + 1.5 * winter + rnd() * 0.5);
+    if (rnd() < 0.22 && d !== end) continue; // Tage auslassen
+    const r = { e1: Math.round(e1), e2: Math.round(e2), wp: Math.round(wp * 10) / 10, w: Math.round(w * 10) / 10, g: Math.round(g * 10) / 10 };
+    if (rnd() < 0.1) delete r.w;
+    out[fromDay(d)] = r;
+  }
+  return out;
+}
+let realReadingsEmpty = true;
+function finishLoad() {
+  S.loaded = true;
+  realReadingsEmpty = Object.keys(S.readings).length === 0;
+  S.demo = realReadingsEmpty;
+  if (S.demo) S.readings = makeDemo();
+  $("demoBanner").hidden = !S.demo;
+  recompute(); renderAll();
+}
+
+/* ---------- Berechnung ---------- */
+let M = null; // Ergebnis der Berechnung
+function tariffFor(ds) {
+  let best = null;
+  for (const t of S.settings.tariffs) if (t.from && t.from <= ds && (!t.to || ds <= t.to) && (!best || t.from > best.from)) best = t;
+  return best;
+}
+function currentTariff() { return tariffFor(todayStr()) || [...S.settings.tariffs].filter(t => t.from).sort((a, b) => a.from < b.from ? 1 : -1)[0] || null; }
+
+const METRICS = {
+  total: { label: "Kosten gesamt", unit: "€", dec: 2, color: "--c-kosten", costOnly: true },
+  eTot: { label: "Strom gesamt", unit: "kWh", dec: 0, color: "--c-strom" },
+  e1: { label: () => S.settings.name1, unit: "kWh", dec: 0, color: "--c-strom", note: "nur Arbeitspreis" },
+  e2: { label: () => S.settings.name2, unit: "kWh", dec: 0, color: "--c-strom", note: "nur Arbeitspreis" },
+  wp: { label: "Wärmepumpe", unit: "kWh", dec: 1, color: "--c-wp", note: "Arbeitspreis, im Strom enthalten" },
+  hh: { label: "Strom ohne Wärmepumpe", unit: "kWh", dec: 0, color: "--c-hh" },
+  w: { label: "Wasser", unit: "m³", dec: 1, color: "--c-wasser" },
+  g: { label: "Gas (Zähler)", unit: "m³", dec: 1, color: "--c-gas" },
+  gk: { label: "Gas (Energie)", unit: "kWh", dec: 0, color: "--c-gas" },
+};
+const mLabel = k => { const l = METRICS[k].label; return typeof l === "function" ? l() : l; };
+
+// Kosten eines Tages aus einem Verbrauchswert (auch für Prognosen genutzt)
+function costOf(k, v, t, ds) {
+  if (v == null || !t) return null;
+  const yd = isLeap(+ds.slice(0, 4)) ? 366 : 365;
+  switch (k) {
+    case "eTot": case "hh": return v * t.pE + (t.gE || 0) / yd;
+    case "e1": case "e2": case "wp": return v * t.pE;
+    case "w": return v * t.pW + (t.gW || 0) / yd;
+    case "g": return v * (t.bw || 0) * (t.zz || 0) * t.pG + (t.gG || 0) * 12 / yd;
+    case "gk": return v * t.pG + (t.gG || 0) * 12 / yd;
+  }
+  return null;
+}
+
+function recompute() {
+  const R = S.readings; const series = {};
+  let minD = Infinity, maxD = -Infinity;
+  for (const { k } of METERS) {
+    const pts = Object.entries(R).filter(([, r]) => r[k] != null).map(([d, r]) => [toDay(d), r[k]]).sort((a, b) => a[0] - b[0]);
+    const map = new Map(); let resets = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [da, va] = pts[i], [db_, vb] = pts[i + 1]; const n = db_ - da; let delta = vb - va;
+      if (delta < 0) { resets++; delta = 0; }
+      for (let d = da; d < db_; d++) map.set(d, { v: delta / n, est: n > 1 });
+    }
+    series[k] = { map, pts, resets };
+    if (pts.length > 1) { minD = Math.min(minD, pts[0][0]); maxD = Math.max(maxD, pts[pts.length - 1][0] - 1); }
+  }
+  const days = [];
+  if (isFinite(minD)) for (let d = minD; d <= maxD; d++) {
+    const ds = fromDay(d); const t = tariffFor(ds); const rec = { d, ds, t, est: {} };
+    for (const { k } of METERS) { const x = series[k].map.get(d); rec[k] = x ? x.v : null; rec.est[k] = x ? x.est : false; }
+    rec.eTot = rec.e1 == null && rec.e2 == null ? null : (rec.e1 ?? 0) + (rec.e2 ?? 0);
+    rec.est.eTot = rec.est.e1 || rec.est.e2 || (rec.e1 == null) !== (rec.e2 == null);
+    rec.hh = rec.eTot != null && rec.wp != null ? rec.eTot - rec.wp : null; rec.est.hh = rec.est.eTot || rec.est.wp;
+    rec.gk = rec.g != null && t ? rec.g * (t.bw || 0) * (t.zz || 0) : null; rec.est.gk = rec.est.g;
+    rec.c = {};
+    for (const k of ["eTot", "e1", "e2", "wp", "hh", "w", "g", "gk"]) rec.c[k] = costOf(k, rec[k], t, ds);
+    const parts = [rec.c.eTot, rec.c.w, rec.c.g].filter(x => x != null);
+    rec.total = parts.length ? parts.reduce((a, b) => a + b, 0) : null; rec.c.total = rec.total;
+    rec.est.total = rec.est.eTot || rec.est.w || rec.est.g;
+    rec.noTariff = !t;
+    days.push(rec);
+  }
+  const byDay = new Map(days.map(r => [r.d, r]));
+  M = { series, days, byDay, minD, maxD, lastDs: isFinite(maxD) ? fromDay(maxD) : null };
+}
+
+// Ø Tageswert für die Prognose: gleicher Kalendermonat (jüngstes Jahr mit ≥10 Tagen), sonst letzte 30 Tage
+function rate(k, monthIdx) {
+  const val = r => k === "total" ? r.total : r[k];
+  const buckets = {};
+  for (const r of M.days) { const v = val(r); if (v == null) continue; const key = r.ds.slice(0, 7); (buckets[key] ||= { s: 0, n: 0 }); buckets[key].s += v; buckets[key].n++; }
+  const cands = Object.entries(buckets).filter(([key, b]) => +key.slice(5, 7) - 1 === monthIdx && b.n >= 10).sort((a, b) => a[0] < b[0] ? 1 : -1);
+  if (cands.length) return { v: cands[0][1].s / cands[0][1].n, src: "month" };
+  let s = 0, n = 0;
+  for (let i = M.days.length - 1; i >= 0 && n < 30; i--) { const v = val(M.days[i]); if (v != null) { s += v; n++; } }
+  return n ? { v: s / n, src: "recent" } : null;
+}
+function forecastDay(k, d, cache) {
+  const ds = fromDay(d); const mi = +ds.slice(5, 7) - 1; const ck = k + mi;
+  if (!(ck in cache)) cache[ck] = rate(k, mi);
+  const r = cache[ck]; if (!r) return null;
+  const t = currentTariff();
+  if (k === "total") {
+    // Gesamtkosten als Summe der Einzelprognosen
+    let sum = 0, any = false;
+    for (const kk of ["eTot", "w", "g"]) { const f = forecastDay(kk, d, cache); if (f && f.c != null) { sum += f.c; any = true; } }
+    return any ? { v: sum, c: sum } : null;
+  }
+  return { v: r.v, c: costOf(k, r.v, t, ds) };
+}
+
+// Aggregation in Tage/Monate/Jahre inkl. Prognose bis "toDs"
+function aggregate(k, gran, fromDs, toDs, withFc) {
+  const keyOf = ds => gran === "day" ? ds : gran === "month" ? ds.slice(0, 7) : ds.slice(0, 4);
+  const B = new Map(); const get = key => { if (!B.has(key)) B.set(key, { key, v: 0, c: 0, n: 0, est: 0, fv: 0, fc: 0, fn: 0, noT: 0, has: false }); return B.get(key); };
+  const f = toDay(fromDs), t = toDay(toDs);
+  for (const r of M.days) {
+    if (r.d < f || r.d > t) continue;
+    const v = k === "total" ? r.total : r[k]; if (v == null) continue;
+    const b = get(keyOf(r.ds)); b.has = true; b.v += v; b.c += r.c[k] ?? 0; b.n++; if (r.est[k]) b.est++; if (r.noTariff) b.noT++;
+  }
+  if (withFc && M.lastDs) {
+    const cache = {}; const start = Math.max(f, M.maxD + 1);
+    for (let d = start; d <= t; d++) { const x = forecastDay(k, d, cache); if (!x) break; const b = get(keyOf(fromDay(d))); b.fv += x.v; b.fc += x.c ?? 0; b.fn++; }
+  }
+  return [...B.values()].sort((a, b) => a.key < b.key ? -1 : 1);
+}
+function sumRange(k, fromDs, toDs, withFc) {
+  const rows = aggregate(k, "year", fromDs, toDs, withFc);
+  return rows.reduce((a, b) => ({ v: a.v + b.v, c: a.c + b.c, n: a.n + b.n, fv: a.fv + b.fv, fc: a.fc + b.fc, fn: a.fn + b.fn }), { v: 0, c: 0, n: 0, fv: 0, fc: 0, fn: 0 });
+}
+
+/* ---------- Farben / Diagramme ---------- */
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function alpha(hex, a) { const m = hex.replace("#", ""); const n = parseInt(m.length === 3 ? m.split("").map(c => c + c).join("") : m, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+const charts = {};
+function chartBase() {
+  const fg = css("--muted"), line = css("--line");
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: { legend: { labels: { color: css("--fg"), boxWidth: 12, font: { family: "IBM Plex Sans" } } }, tooltip: { titleFont: { family: "IBM Plex Sans" }, bodyFont: { family: "IBM Plex Mono" } } },
+    scales: { x: { ticks: { color: fg, font: { family: "IBM Plex Sans" }, maxRotation: 0, autoSkip: true }, grid: { display: false }, border: { color: line } },
+              y: { ticks: { color: fg, font: { family: "IBM Plex Mono" } }, grid: { color: alpha(css("--line").startsWith("#") ? css("--line") : "#888888", 0.7) }, border: { display: false }, beginAtZero: true } },
+  };
+}
+function drawChart(id, cfg) { if (!window.Chart) return; charts[id]?.destroy(); charts[id] = new Chart($(id), cfg); }
+const periodLabel = (key, gran) => gran === "day" ? `${key.slice(8, 10)}.${key.slice(5, 7)}.` : gran === "month" ? `${MONTHS[+key.slice(5, 7) - 1]} ${key.slice(2, 4)}` : key;
+
+/* ---------- Ansichten ---------- */
+const VIEWS = ["erfassen", "uebersicht", "auswertung", "tarife", "daten"];
+let view = "erfassen";
+function route() {
+  const h = location.hash.slice(1); view = VIEWS.includes(h) ? h : (S.loaded && !S.demo ? "uebersicht" : "erfassen");
+  if (!VIEWS.includes(h) && !S.loaded) view = "erfassen";
+  for (const v of VIEWS) $("view-" + v).hidden = v !== view;
+  document.querySelectorAll("nav.tabs a").forEach(a => { if (a.dataset.view === view) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  renderView();
+}
+function renderAll() { renderEntry(); renderView(); }
+function renderView() {
+  if (!S.loaded) return;
+  if (view === "erfassen") renderEntry();
+  if (view === "uebersicht") renderOverview();
+  if (view === "auswertung") renderAnalysis();
+  if (view === "tarife") renderTariffs();
+  if (view === "daten") renderData();
+}
+
+/* ---------- Erfassen ---------- */
+function prevReading(k, ds) { let best = null; for (const [d, r] of Object.entries(S.readings)) if (d < ds && r[k] != null && (!best || d > best[0])) best = [d, r[k]]; return best; }
+function nextReading(k, ds) { let best = null; for (const [d, r] of Object.entries(S.readings)) if (d > ds && r[k] != null && (!best || d < best[0])) best = [d, r[k]]; return best; }
+function buildMeterRows() {
+  $("meterRows").innerHTML = METERS.map(m => `
+    <div class="meter-row">
+      <span class="swatch" style="background:var(${m.color})"></span>
+      <div><label class="name" for="in-${m.k}"></label> <span class="muted">· ${m.unit}${m.k === "wp" ? " · im " + "<span data-wpin></span> enthalten" : ""}</span><div class="hint" id="hint-${m.k}"></div></div>
+      <div class="meter-in"><input class="meter" id="in-${m.k}" inputmode="decimal" placeholder="${m.dec ? "0,0" : "0"}"></div>
+    </div>`).join("");
+  METERS.forEach(m => $("in-" + m.k).addEventListener("input", () => updateHints()));
+}
+function updateHints() {
+  const ds = $("entryDate").value; if (!ds) return;
+  for (const m of METERS) {
+    const el = $("hint-" + m.k); const p = prevReading(m.k, ds); const nx = nextReading(m.k, ds); const v = parseNum($("in-" + m.k).value);
+    let h = p ? `Zuletzt <b class="num">${fmt(p[1], m.dec)}</b> am ${fmtDate(p[0])}` : "Noch kein früherer Stand";
+    if (v != null && !isNaN(v) && p) {
+      const diff = v - p[1]; const n = toDay(ds) - toDay(p[0]);
+      if (diff < 0) h += ` · <span class="bad">kleiner als zuvor (Zählertausch?)</span>`;
+      else h += ` · seitdem <b class="num">${fmt(diff, m.dec)} ${m.unit}</b>${n > 1 ? ` (Ø ${fmt(diff / n, m.dec ? 2 : 1)}/Tag)` : ""}`;
+    }
+    if (v != null && !isNaN(v) && nx && v > nx[1]) h += ` · <span class="warn">größer als am ${fmtDate(nx[0])}</span>`;
+    if (Number.isNaN(v)) h += ` · <span class="bad">keine gültige Zahl</span>`;
+    el.innerHTML = h;
+  }
+}
+function loadEntry(ds) {
+  $("entryDate").value = ds;
+  const r = S.demo ? null : S.readings[ds];
+  for (const m of METERS) $("in-" + m.k).value = r && r[m.k] != null ? fmt(r[m.k], m.dec).replace(/\./g, "") : "";
+  $("entryWd").textContent = WD[new Date(toDay(ds) * DAY).getUTCDay()];
+  $("delWrap").innerHTML = r ? `<button type="button" class="danger" id="delBtn">Tag löschen</button>` : "";
+  if (r) $("delBtn").onclick = askDelete;
+  updateHints();
+}
+function askDelete() {
+  $("delWrap").innerHTML = `<span class="confirm">Ablesung vom ${fmtDate($("entryDate").value)} löschen? <button type="button" class="danger small" id="delYes">Löschen</button><button type="button" class="small" id="delNo">Abbrechen</button></span>`;
+  $("delYes").onclick = async () => { const ds = $("entryDate").value; delete S.readings[ds]; await saveAfterChange(ds.slice(0, 4), "Ablesung gelöscht."); loadEntry(ds); };
+  $("delNo").onclick = () => loadEntry($("entryDate").value);
+}
+function toast(id, msg, err) { const el = $(id); el.textContent = msg; el.className = "toast" + (err ? " err" : ""); clearTimeout(el._t); el._t = setTimeout(() => el.textContent = "", 4000); }
+async function saveAfterChange(year, msg, toastId = "toast") {
+  recompute(); renderAll();
+  try { await persistYear(year); toast(toastId, msg); }
+  catch (e) { toast(toastId, e?.code === "quota_exceeded" ? "Speicher voll. Bitte alte Daten exportieren und löschen." : "Speichern fehlgeschlagen. Bitte erneut versuchen.", true); }
+}
+function renderEntry() {
+  if (!$("entryDate").value) loadEntry(todayStr());
+  document.querySelectorAll("[data-wpin]").forEach(el => el.textContent = S.settings.wpIn === "e1" ? S.settings.name1 : S.settings.name2);
+  METERS.forEach(m => { const l = document.querySelector(`label[for=in-${m.k}]`); if (l) l.textContent = meterLabel(m); });
+  const list = Object.keys(S.readings).sort().reverse().slice(0, 8);
+  $("recentList").innerHTML = list.length ? list.map(ds => {
+    const r = S.readings[ds];
+    const chips = METERS.filter(m => r[m.k] != null).map(m => `<span class="chip" style="--chip:var(${m.color})">${m.k === "e1" ? "S1" : m.k === "e2" ? "S2" : m.k === "wp" ? "WP" : m.k === "w" ? "W" : "G"}</span>`).join("");
+    return `<li data-ds="${ds}"><span class="num">${fmtDate(ds)}</span><span class="chips">${chips}</span></li>`;
+  }).join("") : `<li class="muted" style="cursor:default">Noch keine Ablesungen.</li>`;
+  if (S.demo) $("recentList").insertAdjacentHTML("afterbegin", `<li class="muted" style="cursor:default;border-top:0">Beispielwerte, nicht bearbeitbar</li>`);
+  $("recentList").querySelectorAll("li[data-ds]").forEach(li => li.onclick = () => { if (!S.demo) loadEntry(li.dataset.ds); });
+}
+function shiftDate(n) { const ds = $("entryDate").value || todayStr(); loadEntry(fromDay(toDay(ds) + n)); }
+$("dPrev").onclick = () => shiftDate(-1); $("dNext").onclick = () => shiftDate(1); $("dToday").onclick = () => loadEntry(todayStr());
+$("entryDate").addEventListener("change", () => { if ($("entryDate").value) loadEntry($("entryDate").value); });
+$("clearBtn").onclick = () => { METERS.forEach(m => $("in-" + m.k).value = ""); updateHints(); };
+$("entryForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const ds = $("entryDate").value; if (!ds) return toast("toast", "Bitte ein Datum wählen.", true);
+  const rec = {};
+  for (const m of METERS) {
+    const v = parseNum($("in-" + m.k).value);
+    if (Number.isNaN(v)) return toast("toast", `${meterLabel(m)}: keine gültige Zahl.`, true);
+    if (v != null) rec[m.k] = m.dec ? Math.round(v * 10) / 10 : Math.round(v);
+  }
+  if (S.demo) { S.demo = false; S.readings = {}; $("demoBanner").hidden = true; }
+  const existed = !!S.readings[ds];
+  if (Object.keys(rec).length) S.readings[ds] = rec; else if (existed) delete S.readings[ds]; else return toast("toast", "Keine Werte eingetragen.", true);
+  await saveAfterChange(ds.slice(0, 4), Object.keys(rec).length ? `Gespeichert für ${fmtDate(ds)}.` : "Ablesung gelöscht.");
+  loadEntry(ds);
+});
+
+/* ---------- Übersicht ---------- */
+function renderOverview() {
+  const Y = todayStr().slice(0, 4); const PY = String(+Y - 1);
+  const yStart = Y + "-01-01", yEnd = Y + "-12-31";
+  $("ovTitle").textContent = `Übersicht ${Y}`;
+  $("ovLead").textContent = M.lastDs ? `Daten bis ${fmtDate(M.lastDs)}. Prognosen rechnen vom letzten Ablesetag bis zum 31.12. weiter.` : "Für Auswertungen braucht jeder Zähler mindestens zwei Ablesungen.";
+  $("wpMeterName").textContent = S.settings.wpIn === "e1" ? S.settings.name1 : S.settings.name2;
+  const cards = [
+    { k: "total", title: "Kosten gesamt" },
+    { k: "eTot", title: "Strom gesamt" },
+    { k: "wp", title: "Wärmepumpe", sub: "im Strom enthalten" },
+    { k: "hh", title: "Strom ohne Wärmepumpe" },
+    { k: "w", title: "Wasser" },
+    { k: "g", title: "Gas" },
+  ];
+  const last30From = M.lastDs ? fromDay(M.maxD - 29) : yStart;
+  $("kpis").innerHTML = cards.map(({ k, title, sub }) => {
+    const md = METRICS[k]; const isCost = k === "total";
+    const ytd = sumRange(k, yStart, yEnd, false); const prog = sumRange(k, yStart, yEnd, true);
+    const prev = sumRange(k, PY + "-01-01", PY + "-12-31", false);
+    const l30 = M.lastDs ? sumRange(k, last30From, M.lastDs, false) : { v: 0, n: 0, c: 0 };
+    const big = isCost ? eur(prog.c + prog.fc) : `${fmt(prog.v + prog.fv, md.dec)} <small>${md.unit}</small>`;
+    const gk = k === "g" ? sumRange("gk", yStart, yEnd, true) : null;
+    return `<article class="kpi" style="--k:var(${md.color})">
+      <div class="label">${esc(title)}${sub ? ` · <span style="text-transform:none;letter-spacing:0">${sub}</span>` : ""}</div>
+      <div class="big">${big}</div>
+      <div class="note">Prognose für ${Y}${!isCost ? ` · ${eur(prog.c + prog.fc)}` : ""}</div>
+      <dl>
+        <dt>Bisher ${Y}</dt><dd>${isCost ? eur(ytd.c) : fmt(ytd.v, md.dec) + " " + md.unit}</dd>
+        ${!isCost ? `<dt>Kosten bisher</dt><dd>${eur(ytd.c)}</dd>` : ""}
+        <dt>Ø pro Tag (30 T.)</dt><dd>${l30.n ? (isCost ? eur(l30.c / l30.n) : fmt(l30.v / l30.n, md.dec ? 2 : 1) + " " + md.unit) : "–"}</dd>
+        <dt>Ø pro Monat</dt><dd>${prog.n + prog.fn ? (isCost ? eur((prog.c + prog.fc) / 12) : fmt((prog.v + prog.fv) / 12, md.dec) + " " + md.unit) : "–"}</dd>
+        <dt>${PY} gesamt</dt><dd>${prev.n ? (isCost ? eur(prev.c) : fmt(prev.v, md.dec) + " " + md.unit) + (prev.n < 360 ? "*" : "") : "–"}</dd>
+        ${gk ? `<dt>Energie ${Y} (Progn.)</dt><dd>${fmt(gk.v + gk.fv, 0)} kWh</dd>` : ""}
+      </dl>
+    </article>`;
+  }).join("") + `<p class="muted" style="grid-column:1/-1;font-size:.78rem;margin:0">* Vorjahr nicht vollständig erfasst. Kosten von Strom gesamt, Wasser und Gas enthalten die anteiligen Grundgebühren; Wärmepumpe und Zähler-Einzelwerte nur den Arbeitspreis.</p>`;
+
+  // Monatskosten gestapelt
+  const labels = MONTHS.map((m, i) => m);
+  const ds = [];
+  for (const [k, name] of [["eTot", "Strom"], ["w", "Wasser"], ["g", "Gas"]]) {
+    const rows = aggregate(k, "month", yStart, yEnd, true); const by = Object.fromEntries(rows.map(r => [r.key, r]));
+    const col = css(METRICS[k].color);
+    const act = MONTHS.map((_, i) => { const r = by[`${Y}-${pad(i + 1)}`]; return r ? +r.c.toFixed(2) : 0; });
+    const fc = MONTHS.map((_, i) => { const r = by[`${Y}-${pad(i + 1)}`]; return r ? +r.fc.toFixed(2) : 0; });
+    ds.push({ label: name, data: act, backgroundColor: col, stack: "s", borderRadius: 2 });
+    ds.push({ label: name + " (Prognose)", data: fc, backgroundColor: alpha(col, 0.32), stack: "s", borderRadius: 2 });
+  }
+  const base = chartBase();
+  base.scales.x.stacked = true; base.scales.y.stacked = true;
+  base.scales.y.ticks.callback = v => fmt(v, 0) + " €";
+  base.plugins.tooltip.callbacks = { label: c => `${c.dataset.label}: ${eur(c.parsed.y)}`, footer: items => "Summe: " + eur(items.reduce((a, b) => a + b.parsed.y, 0)) };
+  base.plugins.legend.labels.filter = item => !item.text.includes("Prognose");
+  drawChart("ovChart", { type: "bar", data: { labels, datasets: ds }, options: base });
+
+  // WP vs Haushalt
+  const wpRows = Object.fromEntries(aggregate("wp", "month", yStart, yEnd, true).map(r => [r.key, r]));
+  const hhRows = Object.fromEntries(aggregate("hh", "month", yStart, yEnd, true).map(r => [r.key, r]));
+  const g = (rows, i, f) => { const r = rows[`${Y}-${pad(i + 1)}`]; return r ? +(f ? r.fv : r.v).toFixed(1) : 0; };
+  const b2 = chartBase(); b2.scales.x.stacked = true; b2.scales.y.stacked = true;
+  b2.scales.y.ticks.callback = v => fmt(v, 0) + " kWh";
+  b2.plugins.tooltip.callbacks = { label: c => `${c.dataset.label}: ${fmt(c.parsed.y, 0)} kWh` };
+  b2.plugins.legend.labels.filter = item => !item.text.includes("Prognose");
+  const cw = css("--c-wp"), ch = css("--c-hh");
+  drawChart("ovWpChart", { type: "bar", data: { labels, datasets: [
+    { label: "Wärmepumpe", data: MONTHS.map((_, i) => g(wpRows, i)), backgroundColor: cw, stack: "s" },
+    { label: "Wärmepumpe (Prognose)", data: MONTHS.map((_, i) => g(wpRows, i, 1)), backgroundColor: alpha(cw, 0.32), stack: "s" },
+    { label: "Haushalt", data: MONTHS.map((_, i) => g(hhRows, i)), backgroundColor: ch, stack: "s" },
+    { label: "Haushalt (Prognose)", data: MONTHS.map((_, i) => g(hhRows, i, 1)), backgroundColor: alpha(ch, 0.32), stack: "s" },
+  ] }, options: b2 });
+}
+
+/* ---------- Auswertung ---------- */
+let gran = "month"; let rangeTouched = false;
+function defaultRange() {
+  const last = M.lastDs || todayStr(); const Y = +todayStr().slice(0, 4);
+  if (gran === "day") return [fromDay(toDay(last) - 59), last];
+  if (gran === "month") return [`${Y - 1}-01-01`, `${Y}-12-31`];
+  return [M.lastDs ? fromDay(M.minD) : `${Y}-01-01`, `${Y + 1}-12-31`];
+}
+function initAnalysisControls() {
+  $("aMetric").innerHTML = Object.keys(METRICS).map(k => `<option value="${k}">${esc(mLabel(k))}</option>`).join("");
+  $("aMetric").value = "eTot";
+  $("aGran").querySelectorAll("button").forEach(b => b.onclick = () => {
+    gran = b.dataset.g; $("aGran").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    rangeTouched = false; renderAnalysis();
+  });
+  ["aMetric", "aFc"].forEach(id => $(id).addEventListener("change", renderAnalysis));
+  ["aFrom", "aTo"].forEach(id => $(id).addEventListener("change", () => { rangeTouched = true; renderAnalysis(); }));
+}
+function renderAnalysis() {
+  $("aMetric").querySelectorAll("option").forEach(o => o.textContent = mLabel(o.value));
+  if (!rangeTouched || !$("aFrom").value || !$("aTo").value) { const [f, t] = defaultRange(); $("aFrom").value = f; $("aTo").value = t; }
+  const k = $("aMetric").value; const md = METRICS[k]; const isCost = !!md.costOnly;
+  let from = $("aFrom").value, to = $("aTo").value; if (from > to) [from, to] = [to, from];
+  const withFc = $("aFc").checked && gran !== "day";
+  const rows = aggregate(k, gran, from, to, withFc).filter(r => r.n || r.fn);
+  const col = css(md.color), costCol = css("--c-kosten");
+  const labels = rows.map(r => periodLabel(r.key, gran));
+  const base = chartBase();
+  base.scales.x.stacked = true;
+  base.scales.y.stacked = true;
+  base.scales.y.ticks.callback = v => isCost ? fmt(v, 0) + " €" : fmt(v, 0);
+  base.scales.y.title = { display: true, text: isCost ? "€" : md.unit, color: css("--muted") };
+  const datasets = [
+    { type: "bar", label: isCost ? "Kosten" : "Verbrauch", data: rows.map(r => isCost ? +r.c.toFixed(2) : +r.v.toFixed(2)), backgroundColor: rows.map(r => r.est && gran === "day" ? alpha(col, 0.55) : col), stack: "v", yAxisID: "y", order: 2 },
+  ];
+  if (withFc) datasets.push({ type: "bar", label: "Prognose", data: rows.map(r => isCost ? +r.fc.toFixed(2) : +r.fv.toFixed(2)), backgroundColor: alpha(col, 0.3), borderColor: col, borderWidth: { top: 1 }, stack: "v", yAxisID: "y", order: 2 });
+  if (!isCost) {
+    datasets.push({ type: "line", label: "Kosten", data: rows.map(r => +(r.c + (withFc ? r.fc : 0)).toFixed(2)), borderColor: costCol, backgroundColor: costCol, pointRadius: rows.length > 60 ? 0 : 2.5, tension: 0.25, yAxisID: "y2", order: 1 });
+    base.scales.y2 = { position: "right", beginAtZero: true, grid: { display: false }, border: { display: false }, ticks: { color: css("--muted"), font: { family: "IBM Plex Mono" }, callback: v => fmt(v, 0) + " €" } };
+  }
+  base.plugins.tooltip.callbacks = { label: c => `${c.dataset.label}: ${c.dataset.yAxisID === "y2" || isCost ? eur(c.parsed.y) : fmt(c.parsed.y, md.dec) + " " + md.unit}` };
+  drawChart("aChart", { data: { labels, datasets }, options: base });
+
+  // Tabelle
+  const unit = isCost ? "€" : md.unit;
+  const head = `<thead><tr><th>${gran === "day" ? "Tag" : gran === "month" ? "Monat" : "Jahr"}</th>${isCost ? "" : `<th>Verbrauch (${unit})</th>`}<th>Kosten</th><th>Ø / Tag${isCost ? "" : ` (${unit})`}</th><th>Tage erfasst</th><th>Hinweis</th></tr></thead>`;
+  let tv = 0, tc = 0, tn = 0, tfv = 0, tfc = 0;
+  const body = rows.map(r => {
+    tv += r.v; tc += r.c; tn += r.n; tfv += r.fv; tfc += r.fc;
+    const notes = [];
+    if (r.fn && r.n) notes.push(`inkl. Prognose für ${r.fn} T.`); else if (r.fn) notes.push("Prognose");
+    if (r.est && gran === "day") notes.push("geschätzt"); else if (r.est) notes.push(`${r.est} T. geschätzt`);
+    if (r.noT) notes.push(`${r.noT} T. ohne Tarif`);
+    const v = r.v + r.fv, c = r.c + r.fc, n = r.n + r.fn;
+    const label = gran === "day" ? `${WD[new Date(toDay(r.key) * DAY).getUTCDay()].slice(0, 2)} ${fmtDate(r.key)}` : gran === "month" ? `${MONTHS[+r.key.slice(5, 7) - 1]} ${r.key.slice(0, 4)}` : r.key;
+    return `<tr class="${r.n ? "" : "fc"}"><td>${label}</td>${isCost ? "" : `<td class="num">${fmt(v, md.dec)}</td>`}<td class="num">${eur(c)}</td><td class="num">${n ? (isCost ? eur(c / n) : fmt(v / n, md.dec ? 2 : 1)) : "–"}</td><td class="num">${r.n}</td><td style="text-align:left" class="muted">${notes.join(" · ")}</td></tr>`;
+  }).join("");
+  const foot = rows.length ? `<tfoot><tr><td>Summe${tfv || tfc ? " inkl. Prognose" : ""}</td>${isCost ? "" : `<td class="num">${fmt(tv + tfv, md.dec)}</td>`}<td class="num">${eur(tc + tfc)}</td><td class="num">${tn + 0 ? (isCost ? eur((tc + tfc) / (tn + rows.reduce((a, r) => a + r.fn, 0))) : fmt((tv + tfv) / (tn + rows.reduce((a, r) => a + r.fn, 0)), md.dec ? 2 : 1)) : "–"}</td><td class="num">${tn}</td><td></td></tr></tfoot>` : "";
+  $("aTable").innerHTML = rows.length ? head + `<tbody>${[...body.split("</tr>").filter(Boolean).map(x => x + "</tr>")].reverse().join("")}</tbody>` + foot : `<tbody><tr><td class="empty">Für diesen Zeitraum gibt es keine Daten.</td></tr></tbody>`;
+  $("aMethod").textContent = (md.note ? `Kosten: ${md.note}. ` : "") + "Fehlende Tage zwischen zwei Ablesungen werden gleichmäßig verteilt (geschätzt). Prognose: Ø Tagesverbrauch desselben Monats im jüngsten Jahr mit mindestens 10 erfassten Tagen, sonst Ø der letzten 30 Tage; Preise nach dem aktuellen Tarif." + (gran === "day" ? " In der Tagesansicht gibt es keine Prognose." : "");
+}
+
+/* ---------- Tarife ---------- */
+const TCOLS = [
+  ["from", "Gültig ab", "date"], ["to", "Gültig bis", "date"],
+  ["pE", "Strom €/kWh", "n"], ["gE", "Strom Grundgeb. €/Jahr", "n"],
+  ["pW", "Wasser €/m³", "n"], ["gW", "Wasser Grundgeb. €/Jahr", "n"],
+  ["pG", "Gas €/kWh", "n"], ["gG", "Gas Grundgeb. €/Monat", "n"],
+  ["bw", "Gas Brennwert kWh/m³", "n"], ["zz", "Gas Zustandszahl", "n"],
+];
+let tDraft = null;
+function renderTariffs() {
+  if (!tDraft) tDraft = JSON.parse(JSON.stringify(S.settings.tariffs));
+  const fmtIn = v => v == null || v === "" ? "" : String(v).replace(".", ",");
+  $("tariffTable").innerHTML = `<thead><tr>${TCOLS.map(c => `<th>${c[1]}</th>`).join("")}<th></th></tr></thead><tbody>` +
+    tDraft.map((t, i) => `<tr>${TCOLS.map(([k, , type]) => `<td><input id="t-${i}-${k}" data-i="${i}" data-k="${k}" ${type === "date" ? 'type="date"' : 'inputmode="decimal"'} value="${esc(type === "date" ? (t[k] || "") : fmtIn(t[k]))}" aria-label="${k}"></td>`).join("")}<td><button type="button" class="small danger" data-del="${i}" aria-label="Zeitraum entfernen">✕</button></td></tr>`).join("") + "</tbody>";
+  $("tariffTable").querySelectorAll("input").forEach(inp => inp.addEventListener("change", () => {
+    const t = tDraft[+inp.dataset.i]; const k = inp.dataset.k;
+    t[k] = inp.type === "date" ? inp.value : parseNum(inp.value);
+  }));
+  $("tariffTable").querySelectorAll("[data-del]").forEach(b => b.onclick = () => { tDraft.splice(+b.dataset.del, 1); renderTariffs(); });
+  $("sName1").value = S.settings.name1; $("sName2").value = S.settings.name2; $("sWpIn").value = S.settings.wpIn;
+}
+$("addTariff").onclick = () => {
+  if (!tDraft) tDraft = JSON.parse(JSON.stringify(S.settings.tariffs));
+  const last = [...tDraft].sort((a, b) => (a.from || "") < (b.from || "") ? 1 : -1)[0];
+  const Y = +todayStr().slice(0, 4);
+  tDraft.push(last ? { ...last, from: last.to ? fromDay(toDay(last.to) + 1) : `${Y + 1}-01-01`, to: "" } : { ...DEFAULT_SETTINGS().tariffs[0], from: `${Y}-01-01` });
+  renderTariffs();
+};
+$("saveTariffs").onclick = async () => {
+  for (const [i, t] of tDraft.entries()) {
+    if (!t.from) return toast("tariffToast", `Zeile ${i + 1}: "Gültig ab" fehlt.`, true);
+    if (t.to && t.to < t.from) return toast("tariffToast", `Zeile ${i + 1}: Ende liegt vor dem Beginn.`, true);
+    for (const [k, l, type] of TCOLS) if (type === "n" && (t[k] == null || Number.isNaN(t[k]) || t[k] < 0)) { if (k === "gW") t[k] = 0; else return toast("tariffToast", `Zeile ${i + 1}: ${l} fehlt oder ist ungültig.`, true); }
+  }
+  S.settings.tariffs = JSON.parse(JSON.stringify(tDraft)).sort((a, b) => a.from < b.from ? -1 : 1);
+  tDraft = null; recompute(); renderTariffs();
+  try { await persistSettings(); toast("tariffToast", "Tarife gespeichert."); } catch (e) { toast("tariffToast", "Speichern fehlgeschlagen.", true); }
+};
+$("saveSettings").onclick = async () => {
+  S.settings.name1 = $("sName1").value.trim() || "Stromzähler 1"; S.settings.name2 = $("sName2").value.trim() || "Stromzähler 2"; S.settings.wpIn = $("sWpIn").value;
+  initAnalysisLabels(); renderEntry();
+  try { await persistSettings(); toast("settingsToast", "Einstellungen gespeichert."); } catch (e) { toast("settingsToast", "Speichern fehlgeschlagen.", true); }
+};
+function initAnalysisLabels() { $("aMetric").querySelectorAll("option").forEach(o => o.textContent = mLabel(o.value)); }
+
+/* ---------- Daten ---------- */
+function renderData() {
+  const list = Object.keys(S.readings).sort().reverse();
+  $("dataTable").innerHTML = `<thead><tr><th>Datum</th>${METERS.map(m => `<th>${esc(meterLabel(m))} (${m.unit})</th>`).join("")}<th></th></tr></thead><tbody>` +
+    (list.length ? list.map(ds => { const r = S.readings[ds]; return `<tr><td class="num">${WD[new Date(toDay(ds) * DAY).getUTCDay()].slice(0, 2)} ${fmtDate(ds)}</td>${METERS.map(m => `<td class="num">${r[m.k] != null ? fmt(r[m.k], m.dec) : '<span class="muted">–</span>'}</td>`).join("")}<td>${S.demo ? "" : `<button type="button" class="small" data-edit="${ds}">Bearbeiten</button>`}</td></tr>`; }).join("") : `<tr><td colspan="7" class="empty">Noch keine Ablesungen.</td></tr>`) + "</tbody>";
+  $("dataTable").querySelectorAll("[data-edit]").forEach(b => b.onclick = () => { loadEntry(b.dataset.edit); location.hash = "erfassen"; });
+}
+async function offerFile(filename, data) {
+  const file = new File([data], filename, { type: filename.endsWith(".csv") ? "text/csv" : "application/json" });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename });
+      return toast("dataToast", "Datei geteilt bzw. gesichert.");
+    }
+  } catch (e) { if (e && e.name === "AbortError") return; }
+  try {
+    const url = URL.createObjectURL(file); const a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    toast("dataToast", "Datei heruntergeladen.");
+  } catch (e) { toast("dataToast", "Herunterladen nicht möglich.", true); }
+}
+$("expJson").onclick = () => {
+  if (S.demo) return toast("dataToast", "Es gibt noch keine eigenen Daten zum Sichern.", true);
+  offerFile(`zaehlerbuch-${todayStr()}.json`, JSON.stringify({ app: "Zählerbuch", version: 1, exported: todayStr(), readings: S.readings, settings: S.settings }, null, 1));
+};
+$("expCsv").onclick = () => {
+  const n = (v, d) => v == null ? "" : v.toFixed(d).replace(".", ",");
+  const lines = [["Datum", S.settings.name1 + " kWh", S.settings.name2 + " kWh", "Strom gesamt kWh", "Wärmepumpe kWh", "Strom ohne WP kWh", "Wasser m³", "Gas m³", "Gas kWh", "Kosten Strom €", "Kosten Wasser €", "Kosten Gas €", "Kosten gesamt €", "geschätzt"].join(";")];
+  for (const r of M.days) lines.push([r.ds, n(r.e1, 2), n(r.e2, 2), n(r.eTot, 2), n(r.wp, 2), n(r.hh, 2), n(r.w, 3), n(r.g, 3), n(r.gk, 2), n(r.c.eTot, 2), n(r.c.w, 2), n(r.c.g, 2), n(r.total, 2), r.est.total ? "ja" : ""].join(";"));
+  offerFile(`zaehlerbuch-tageswerte-${todayStr()}.csv`, "﻿" + lines.join("\r\n"));
+};
+$("impFile").addEventListener("change", async () => {
+  const f = $("impFile").files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    if (!j || typeof j.readings !== "object") throw 0;
+    const clean = {};
+    for (const [d, r] of Object.entries(j.readings)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || typeof r !== "object" || !r) continue;
+      const x = {}; for (const m of METERS) if (typeof r[m.k] === "number" && isFinite(r[m.k])) x[m.k] = r[m.k];
+      if (Object.keys(x).length) clean[d] = x;
+    }
+    if (S.demo) { S.demo = false; S.readings = {}; $("demoBanner").hidden = true; }
+    Object.assign(S.readings, clean);
+    if (j.settings && Array.isArray(j.settings.tariffs)) {
+      const s = j.settings;
+      S.settings = { name1: String(s.name1 || "Stromzähler 1").slice(0, 40), name2: String(s.name2 || "Stromzähler 2").slice(0, 40), wpIn: s.wpIn === "e1" ? "e1" : "e2",
+        tariffs: s.tariffs.filter(t => t && /^\d{4}-\d{2}-\d{2}$/.test(t.from)).map(t => { const o = { from: t.from, to: /^\d{4}-\d{2}-\d{2}$/.test(t.to) ? t.to : "" }; for (const [k, , ty] of TCOLS) if (ty === "n") o[k] = +t[k] || 0; return o; }) };
+      tDraft = null; await persistSettings();
+    }
+    recompute(); renderAll();
+    const years = [...new Set(Object.keys(clean).map(d => d.slice(0, 4)))];
+    for (const y of years) await persistYear(y);
+    toast("dataToast", `${Object.keys(clean).length} Ablesungen eingespielt.`);
+  } catch (e) { toast("dataToast", "Die Datei ist keine gültige Zählerbuch-Sicherung.", true); }
+  $("impFile").value = "";
+});
+
+/* ---------- Start ---------- */
+buildMeterRows(); initAnalysisControls();
+window.addEventListener("hashchange", route);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => renderView());
+new MutationObserver(() => renderView()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+route();
+initStore();
+if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+</script>
+</body>
+</html>
+
