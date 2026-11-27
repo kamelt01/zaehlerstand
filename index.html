@@ -329,7 +329,8 @@ nav.tabs a svg { display: none; }
     </div>
     <div class="panel stack">
       <div class="actions" style="margin-top:0">
-        <button type="button" id="expJson">Sicherung herunterladen (JSON)</button>
+        <button type="button" id="expJson">Sicherung in Dateien sichern (JSON)</button>
+        <button type="button" id="expShortcut">Sicherung per Kurzbefehl (fester Ordner)</button>
         <button type="button" id="expCsv">Tageswerte herunterladen (CSV)</button>
         <label class="btn" for="impFile" style="display:inline-block">Sicherung einspielen …</label>
         <input type="file" id="impFile" accept=".json,application/json,text/plain" hidden>
@@ -885,6 +886,14 @@ async function offerFile(filename, data) {
 $("expJson").onclick = () => {
   if (S.demo) return toast("dataToast", "Es gibt noch keine eigenen Daten zum Sichern.", true);
   offerFile(`zaehlerbuch-${todayStr()}.json`, JSON.stringify({ app: "Zählerbuch", version: 1, exported: todayStr(), readings: S.readings, settings: S.settings }, null, 1));
+};
+$("expShortcut").onclick = async () => {
+  if (S.demo) return toast("dataToast", "Es gibt noch keine eigenen Daten zum Sichern.", true);
+  const json = JSON.stringify({ app: "Zählerbuch", version: 1, exported: todayStr(), readings: S.readings, settings: S.settings }, null, 1);
+  try { await navigator.clipboard.writeText(json); }
+  catch (e) { return toast("dataToast", "Zwischenablage nicht verfügbar. Nutze die Sicherung in Dateien.", true); }
+  toast("dataToast", "Sicherung kopiert. Kurzbefehl „Zählerbuch sichern“ startet …");
+  setTimeout(() => { location.href = "shortcuts://run-shortcut?name=" + encodeURIComponent("Zählerbuch sichern"); }, 500);
 };
 $("expCsv").onclick = () => {
   const n = (v, d) => v == null ? "" : v.toFixed(d).replace(".", ",");
