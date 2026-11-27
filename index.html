@@ -142,6 +142,46 @@ tfoot td { font-weight: 600; border-top: 2px solid var(--line); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 html { scroll-padding-top: env(safe-area-inset-top, 0px); -webkit-text-size-adjust: 100%; }
+[hidden] { display: none !important; }
+nav.tabs a svg { display: none; }
+@media (max-width: 700px) {
+  .top .wrap { padding-block: 8px; gap: 8px; }
+  nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; gap: 0; flex-wrap: nowrap; background: var(--surface); border-top: 1px solid var(--line); padding: 6px max(4px, env(safe-area-inset-left, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)); }
+  nav.tabs a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; padding: 4px 0; font-size: 0.7rem; border-radius: 10px; }
+  nav.tabs a svg { display: block; width: 24px; height: 24px; }
+  nav.tabs a:hover { background: none; }
+  nav.tabs a[aria-current="page"] { background: none; color: var(--accent); }
+  main { padding-block: 16px calc(110px + env(safe-area-inset-bottom, 0px)); }
+  h1 { font-size: 1.35rem; }
+  .lead { display: none; }
+  input, select { font-size: 16px; min-height: 44px; }
+  button, .btn { min-height: 44px; }
+  button.small { min-height: 36px; }
+  .datebar { flex-wrap: nowrap; }
+  .datebar input[type=date] { flex: 1; min-width: 0; }
+  .datebar .wd { display: none; }
+  #dPrev, #dNext { min-width: 44px; padding: 0; }
+  #dToday { padding: 0 10px; }
+  .datebar { gap: 6px; }
+  .meters { gap: 10px; }
+  .meter-row { grid-template-columns: 6px minmax(0, 1fr); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .meter-row:first-child { border-top: 1px solid var(--line); }
+  input.meter { font-size: 1.6rem; min-height: 56px; }
+  .actions { position: sticky; bottom: calc(68px + env(safe-area-inset-bottom, 0px)); background: var(--surface); padding: 10px 0 4px; margin-top: 12px; z-index: 10; }
+  .actions .primary { flex: 1; min-height: 52px; font-size: 1.05rem; }
+  .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi { padding: 12px; cursor: pointer; }
+  .kpi:first-child, .kpi.open { grid-column: 1 / -1; }
+  .kpi .big { font-size: 1.2rem; }
+  .kpi:first-child .big { font-size: 1.8rem; }
+  .kpi dl > :nth-child(n+5) { display: none; }
+  .kpi.open dl > :nth-child(n+5) { display: revert; }
+  .kpi::after { content: "Details ▾"; font-size: 0.75rem; color: var(--muted); }
+  .kpi.open::after { content: "weniger ▴"; }
+  #aTable th:nth-child(n+4), #aTable td:nth-child(n+4) { display: none; }
+  th, td { padding: 12px 10px; }
+  .chart-box { height: 240px; }
+}
 </style>
 </head>
 <body>
@@ -150,11 +190,11 @@ html { scroll-padding-top: env(safe-area-inset-top, 0px); -webkit-text-size-adju
   <div class="wrap">
     <div class="brand"><span class="dial" aria-hidden="true"></span>Zählerbuch</div>
     <nav class="tabs" aria-label="Ansichten">
-      <a href="#erfassen" data-view="erfassen">Erfassen</a>
-      <a href="#uebersicht" data-view="uebersicht">Übersicht</a>
-      <a href="#auswertung" data-view="auswertung">Auswertung</a>
-      <a href="#tarife" data-view="tarife">Tarife</a>
-      <a href="#daten" data-view="daten">Daten</a>
+      <a href="#erfassen" data-view="erfassen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Erfassen</span></a>
+      <a href="#uebersicht" data-view="uebersicht"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>Übersicht</span></a>
+      <a href="#auswertung" data-view="auswertung"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Auswertung</span></a>
+      <a href="#tarife" data-view="tarife"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 7.5a5.5 5.5 0 1 0 0 9M5 10h9M5 14h9"/></svg><span>Tarife</span></a>
+      <a href="#daten" data-view="daten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg><span>Daten</span></a>
     </nav>
     <div class="status" id="status"><span class="dot"></span><span id="statusText">Lade …</span></div>
   </div>
@@ -568,6 +608,7 @@ function updateHints() {
     }
     if (v != null && !isNaN(v) && nx && v > nx[1]) h += ` · <span class="warn">größer als am ${fmtDate(nx[0])}</span>`;
     if (Number.isNaN(v)) h += ` · <span class="bad">keine gültige Zahl</span>`;
+    if (m.k === "g" && v == null && p) h += ` · <span class="muted">leer lassen: Stand wird übernommen</span>`;
     el.innerHTML = h;
   }
 }
@@ -617,10 +658,12 @@ $("entryForm").addEventListener("submit", async e => {
     if (Number.isNaN(v)) return toast("toast", `${meterLabel(m)}: keine gültige Zahl.`, true);
     if (v != null) rec[m.k] = m.dec ? Math.round(v * 10) / 10 : Math.round(v);
   }
+  let carried = null;
+  if (!S.demo && rec.g == null && Object.keys(rec).length) { const p = prevReading("g", ds); if (p) { rec.g = p[1]; carried = p[1]; } }
   if (S.demo) { S.demo = false; S.readings = {}; $("demoBanner").hidden = true; }
   const existed = !!S.readings[ds];
   if (Object.keys(rec).length) S.readings[ds] = rec; else if (existed) delete S.readings[ds]; else return toast("toast", "Keine Werte eingetragen.", true);
-  await saveAfterChange(ds.slice(0, 4), Object.keys(rec).length ? `Gespeichert für ${fmtDate(ds)}.` : "Ablesung gelöscht.");
+  await saveAfterChange(ds.slice(0, 4), Object.keys(rec).length ? `Gespeichert für ${fmtDate(ds)}.` + (carried != null ? ` Gas: letzter Stand ${fmt(carried, 1)} übernommen.` : "") : "Ablesung gelöscht.");
   loadEntry(ds);
 });
 
@@ -868,6 +911,7 @@ buildMeterRows(); initAnalysisControls();
 window.addEventListener("hashchange", route);
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => renderView());
 new MutationObserver(() => renderView()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+$("kpis").addEventListener("click", e => { const k = e.target.closest(".kpi"); if (k) k.classList.toggle("open"); });
 route();
 initStore();
 if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
