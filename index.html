@@ -143,6 +143,9 @@ tfoot td { font-weight: 600; border-top: 2px solid var(--line); }
 :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 html { scroll-padding-top: env(safe-area-inset-top, 0px); -webkit-text-size-adjust: 100%; }
 [hidden] { display: none !important; }
+.swap label, .swlbl { display: block; font-size: 0.78rem; color: var(--muted); font-weight: 500; margin: 8px 0 3px; }
+.swap { margin-bottom: 4px; }
+.swbtn { margin-top: 8px; }
 nav.tabs a svg { display: none; }
 @media (max-width: 700px) {
   .top .wrap { padding-block: 8px; gap: 8px; }
@@ -471,10 +474,10 @@ function recompute() {
   const R = S.readings; const series = {};
   let minD = Infinity, maxD = -Infinity;
   for (const { k } of METERS) {
-    const pts = Object.entries(R).filter(([, r]) => r[k] != null).map(([d, r]) => [toDay(d), r[k]]).sort((a, b) => a[0] - b[0]);
+    const pts = Object.entries(R).filter(([, r]) => r[k] != null).map(([d, r]) => [toDay(d), r[k], r.o && r.o[k] != null ? r.o[k] : null]).sort((a, b) => a[0] - b[0]);
     const map = new Map(); let resets = 0;
     for (let i = 0; i < pts.length - 1; i++) {
-      const [da, va] = pts[i], [db_, vb] = pts[i + 1]; const n = db_ - da; let delta = vb - va;
+      const [da, va] = pts[i], [db_, vb, ob] = pts[i + 1]; const n = db_ - da; let delta = (ob != null ? ob : vb) - va;
       if (delta < 0) { resets++; delta = 0; }
       for (let d = da; d < db_; d++) map.set(d, { v: delta / n, est: n > 1 });
     }
@@ -585,6 +588,7 @@ function renderView() {
 }
 
 /* ---------- Erfassen ---------- */
+const swapTag = (r, m) => r.o && r.o[m.k] != null ? ` <span class="muted" title="Zählertausch, Endstand alter Zähler">(alt ${fmt(r.o[m.k], m.dec)})</span>` : "";
 function prevReading(k, ds) { let best = null; for (const [d, r] of Object.entries(S.readings)) if (d < ds && r[k] != null && (!best || d > best[0])) best = [d, r[k]]; return best; }
 function nextReading(k, ds) { let best = null; for (const [d, r] of Object.entries(S.readings)) if (d > ds && r[k] != null && (!best || d < best[0])) best = [d, r[k]]; return best; }
 function buildMeterRows() {
@@ -592,21 +596,23 @@ function buildMeterRows() {
     <div class="meter-row">
       <span class="swatch" style="background:var(${m.color})"></span>
       <div><label class="name" for="in-${m.k}"></label> <span class="muted">· ${m.unit}${m.k === "wp" ? " · im " + "<span data-wpin></span> enthalten" : ""}</span><div class="hint" id="hint-${m.k}"></div></div>
-      <div class="meter-in"><input class="meter" id="in-${m.k}" inputmode="decimal" placeholder="${m.dec ? "0,0" : "0"}"></div>
+      <div class="meter-in"><div class="swap" id="sw-${m.k}" hidden><label for="ino-${m.k}">Endstand alter Zähler</label><input class="meter" id="ino-${m.k}" inputmode="decimal" placeholder="${m.dec ? "0,0" : "0"}"></div><div class="swlbl" id="swl-${m.k}" hidden>Anfangsstand neuer Zähler</div><input class="meter" id="in-${m.k}" inputmode="decimal" placeholder="${m.dec ? "0,0" : "0"}"><button type="button" class="small swbtn" id="swbtn-${m.k}">Zähler getauscht?</button></div>
     </div>`).join("");
-  METERS.forEach(m => $("in-" + m.k).addEventListener("input", () => updateHints()));
+  METERS.forEach(m => { $("in-" + m.k).addEventListener("input", () => updateHints()); $("ino-" + m.k).addEventListener("input", () => updateHints()); $("swbtn-" + m.k).onclick = () => { setSwap(m.k, $("sw-" + m.k).hidden); updateHints(); }; });
 }
+function setSwap(k, on) { $("sw-" + k).hidden = !on; $("swl-" + k).hidden = !on; $("swbtn-" + k).textContent = on ? "Tausch entfernen" : "Zähler getauscht?"; if (!on) $("ino-" + k).value = ""; }
 function updateHints() {
   const ds = $("entryDate").value; if (!ds) return;
   for (const m of METERS) {
-    const el = $("hint-" + m.k); const p = prevReading(m.k, ds); const nx = nextReading(m.k, ds); const v = parseNum($("in-" + m.k).value);
+    const el = $("hint-" + m.k); const p = prevReading(m.k, ds); const nx = nextReading(m.k, ds); const v = parseNum($("in-" + m.k).value); const sw = !$("sw-" + m.k).hidden; const ov = sw ? parseNum($("ino-" + m.k).value) : null; const ref = sw ? ov : v;
     let h = p ? `Zuletzt <b class="num">${fmt(p[1], m.dec)}</b> am ${fmtDate(p[0])}` : "Noch kein früherer Stand";
-    if (v != null && !isNaN(v) && p) {
-      const diff = v - p[1]; const n = toDay(ds) - toDay(p[0]);
+    if (ref != null && !isNaN(ref) && p) {
+      const diff = ref - p[1]; const n = toDay(ds) - toDay(p[0]);
       if (diff < 0) h += ` · <span class="bad">kleiner als zuvor (Zählertausch?)</span>`;
       else h += ` · seitdem <b class="num">${fmt(diff, m.dec)} ${m.unit}</b>${n > 1 ? ` (Ø ${fmt(diff / n, m.dec ? 2 : 1)}/Tag)` : ""}`;
     }
     if (v != null && !isNaN(v) && nx && v > nx[1]) h += ` · <span class="warn">größer als am ${fmtDate(nx[0])}</span>`;
+    if (Number.isNaN(ov)) h += ` · <span class="bad">Endstand: keine gültige Zahl</span>`;
     if (Number.isNaN(v)) h += ` · <span class="bad">keine gültige Zahl</span>`;
     if (m.k === "g" && v == null && p) h += ` · <span class="muted">leer lassen: Stand wird übernommen</span>`;
     el.innerHTML = h;
@@ -615,7 +621,7 @@ function updateHints() {
 function loadEntry(ds) {
   $("entryDate").value = ds;
   const r = S.demo ? null : S.readings[ds];
-  for (const m of METERS) $("in-" + m.k).value = r && r[m.k] != null ? fmt(r[m.k], m.dec).replace(/\./g, "") : "";
+  for (const m of METERS) { $("in-" + m.k).value = r && r[m.k] != null ? fmt(r[m.k], m.dec).replace(/\./g, "") : ""; const o = r && r.o ? r.o[m.k] : null; setSwap(m.k, o != null); if (o != null) $("ino-" + m.k).value = fmt(o, m.dec).replace(/\./g, ""); }
   $("entryWd").textContent = WD[new Date(toDay(ds) * DAY).getUTCDay()];
   $("delWrap").innerHTML = r ? `<button type="button" class="danger" id="delBtn">Tag löschen</button>` : "";
   if (r) $("delBtn").onclick = askDelete;
@@ -648,16 +654,23 @@ function renderEntry() {
 function shiftDate(n) { const ds = $("entryDate").value || todayStr(); loadEntry(fromDay(toDay(ds) + n)); }
 $("dPrev").onclick = () => shiftDate(-1); $("dNext").onclick = () => shiftDate(1); $("dToday").onclick = () => loadEntry(todayStr());
 $("entryDate").addEventListener("change", () => { if ($("entryDate").value) loadEntry($("entryDate").value); });
-$("clearBtn").onclick = () => { METERS.forEach(m => $("in-" + m.k).value = ""); updateHints(); };
+$("clearBtn").onclick = () => { METERS.forEach(m => { $("in-" + m.k).value = ""; setSwap(m.k, false); }); updateHints(); };
 $("entryForm").addEventListener("submit", async e => {
   e.preventDefault();
   const ds = $("entryDate").value; if (!ds) return toast("toast", "Bitte ein Datum wählen.", true);
-  const rec = {};
+  const rec = {}; const oldEnd = {};
   for (const m of METERS) {
     const v = parseNum($("in-" + m.k).value);
     if (Number.isNaN(v)) return toast("toast", `${meterLabel(m)}: keine gültige Zahl.`, true);
+    if (!$("sw-" + m.k).hidden) {
+      const ov = parseNum($("ino-" + m.k).value);
+      if (Number.isNaN(ov)) return toast("toast", `${meterLabel(m)}: Endstand des alten Zählers ist keine gültige Zahl.`, true);
+      if (ov == null || v == null) return toast("toast", `${meterLabel(m)}: Bitte Endstand des alten und Anfangsstand des neuen Zählers eintragen.`, true);
+      oldEnd[m.k] = m.dec ? Math.round(ov * 10) / 10 : Math.round(ov);
+    }
     if (v != null) rec[m.k] = m.dec ? Math.round(v * 10) / 10 : Math.round(v);
   }
+  if (Object.keys(oldEnd).length) rec.o = oldEnd;
   let carried = null;
   if (!S.demo && rec.g == null && Object.keys(rec).length) { const p = prevReading("g", ds); if (p) { rec.g = p[1]; carried = p[1]; } }
   if (S.demo) { S.demo = false; S.readings = {}; $("demoBanner").hidden = true; }
@@ -851,7 +864,7 @@ function initAnalysisLabels() { $("aMetric").querySelectorAll("option").forEach(
 function renderData() {
   const list = Object.keys(S.readings).sort().reverse();
   $("dataTable").innerHTML = `<thead><tr><th>Datum</th>${METERS.map(m => `<th>${esc(meterLabel(m))} (${m.unit})</th>`).join("")}<th></th></tr></thead><tbody>` +
-    (list.length ? list.map(ds => { const r = S.readings[ds]; return `<tr><td class="num">${WD[new Date(toDay(ds) * DAY).getUTCDay()].slice(0, 2)} ${fmtDate(ds)}</td>${METERS.map(m => `<td class="num">${r[m.k] != null ? fmt(r[m.k], m.dec) : '<span class="muted">–</span>'}</td>`).join("")}<td>${S.demo ? "" : `<button type="button" class="small" data-edit="${ds}">Bearbeiten</button>`}</td></tr>`; }).join("") : `<tr><td colspan="7" class="empty">Noch keine Ablesungen.</td></tr>`) + "</tbody>";
+    (list.length ? list.map(ds => { const r = S.readings[ds]; return `<tr><td class="num">${WD[new Date(toDay(ds) * DAY).getUTCDay()].slice(0, 2)} ${fmtDate(ds)}</td>${METERS.map(m => `<td class="num">${r[m.k] != null ? fmt(r[m.k], m.dec) + swapTag(r, m) : '<span class="muted">–</span>'}</td>`).join("")}<td>${S.demo ? "" : `<button type="button" class="small" data-edit="${ds}">Bearbeiten</button>`}</td></tr>`; }).join("") : `<tr><td colspan="7" class="empty">Noch keine Ablesungen.</td></tr>`) + "</tbody>";
   $("dataTable").querySelectorAll("[data-edit]").forEach(b => b.onclick = () => { loadEntry(b.dataset.edit); location.hash = "erfassen"; });
 }
 async function offerFile(filename, data) {
@@ -888,6 +901,7 @@ $("impFile").addEventListener("change", async () => {
     for (const [d, r] of Object.entries(j.readings)) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || typeof r !== "object" || !r) continue;
       const x = {}; for (const m of METERS) if (typeof r[m.k] === "number" && isFinite(r[m.k])) x[m.k] = r[m.k];
+      if (r.o && typeof r.o === "object") { const o = {}; for (const m of METERS) if (typeof r.o[m.k] === "number" && isFinite(r.o[m.k]) && x[m.k] != null) o[m.k] = r.o[m.k]; if (Object.keys(o).length) x.o = o; }
       if (Object.keys(x).length) clean[d] = x;
     }
     if (S.demo) { S.demo = false; S.readings = {}; $("demoBanner").hidden = true; }
